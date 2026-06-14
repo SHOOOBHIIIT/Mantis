@@ -22,13 +22,29 @@ class _FallbackDoc:
 
 
 def _keyword_score(text: str, query: str) -> float:
-    """Simple keyword overlap score for fallback retrieval."""
+    """Keyword overlap score for fallback retrieval. Filters stop words to avoid false matches."""
+    STOP_WORDS = {
+        "i", "me", "my", "the", "a", "an", "is", "are", "was", "were", "be",
+        "been", "being", "have", "has", "had", "do", "does", "did", "will",
+        "would", "could", "should", "can", "may", "might", "shall", "to",
+        "of", "in", "for", "on", "with", "at", "by", "from", "as", "into",
+        "through", "during", "before", "after", "above", "below", "between",
+        "out", "off", "over", "under", "again", "further", "then", "once",
+        "here", "there", "when", "where", "why", "how", "all", "each",
+        "every", "both", "few", "more", "most", "other", "some", "such",
+        "no", "nor", "not", "only", "own", "same", "so", "than", "too",
+        "very", "just", "about", "up", "it", "its", "this", "that", "these",
+        "those", "am", "but", "and", "or", "if", "what", "which", "who",
+        "whom", "while", "because", "until", "he", "she", "they", "them",
+        "his", "her", "we", "you", "your", "our", "their",
+    }
     text_lower = text.lower()
-    query_words = query.lower().split()
+    query_words = [w for w in query.lower().split() if w not in STOP_WORDS and len(w) > 2]
     if not query_words:
         return 0.0
     hits = sum(1 for w in query_words if w in text_lower)
     return hits / len(query_words)
+
 
 
 async def create_product_index(product_id: str, chunks: List[Dict]) -> None:
@@ -92,8 +108,8 @@ async def query_product_index(
             scored.append(_FallbackDoc(chunk, score))
 
         scored.sort(key=lambda d: d.score, reverse=True)
-        # Filter to only results with at least one keyword match
-        scored = [d for d in scored if d.score > 0]
+        # Filter out weak matches — only return genuinely relevant results
+        scored = [d for d in scored if d.score >= 0.3]
         elapsed_ms = int((time.time() - start) * 1000)
         return scored[:top_k], elapsed_ms
 
