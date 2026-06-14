@@ -31,6 +31,52 @@ async def _index_product(product_id: str):
         ).eq("product_id", product_id).execute()
 
 
+def _process_pdf_background(file_bytes: bytes, doc_id: str, product_id: str, title: str, file_url: str):
+    """Background task: parse PDF, insert chunks, then trigger MOSS indexing."""
+    import asyncio
+
+    # Save temp file for parsing
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+
+    try:
+        chunks, page_count = extract_chunks_and_count(tmp_path, doc_id, product_id)
+    except Exception as e:
+        supabase.table("knowledge_documents").update(
+            {"indexing_error": f"PDF parsing failed: {e}"}
+        ).eq("id", doc_id).execute()
+        return
+    finally:
+        os.unlink(tmp_path)
+
+    # Update document record with page/chunk counts
+    supabase.table("knowledge_documents").update({
+        "page_count": page_count,
+        "chunk_count": len(chunks),
+    }).eq("id", doc_id).execute()
+
+    # Save chunks to DB in batches of 100
+    chunk_rows = [
+        {
+            "document_id": doc_id,
+            "product_id": product_id,
+            "chunk_index": c["chunk_index"],
+            "content": c["content"],
+            "page_number": c["page_number"],
+            "section_tag": c["section_tag"],
+            "char_count": c["char_count"],
+        }
+        for c in chunks
+    ]
+
+    for i in range(0, len(chunk_rows), 100):
+        supabase.table("document_chunks").insert(chunk_rows[i : i + 100]).execute()
+
+    # Trigger MOSS indexing
+    asyncio.run(_index_product(product_id))
+
+
 @router.get("/{product_id}")
 async def get_documents(product_id: str):
     result = supabase.table("knowledge_documents").select("*").eq("product_id", product_id).order("created_at", desc=True).execute()
@@ -60,56 +106,27 @@ async def upload_document(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Storage upload failed: {e}")
 
-    # Save temp file for parsing
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(file_bytes)
-        tmp_path = tmp.name
-
-    try:
-        chunks, page_count = extract_chunks_and_count(tmp_path, doc_id, product_id)
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"PDF parsing failed: {e}")
-    finally:
-        os.unlink(tmp_path)
-
-    # Save document record
+    # Save document record immediately (so the UI can show it)
     supabase.table("knowledge_documents").insert({
         "id": doc_id,
         "product_id": product_id,
         "title": title,
         "type": "pdf",
         "file_url": file_url,
-        "page_count": page_count,
-        "chunk_count": len(chunks),
+        "page_count": 0,
+        "chunk_count": 0,
         "indexed": False,
     }).execute()
 
-    # Save chunks to DB in batches of 100
-    chunk_rows = [
-        {
-            "document_id": doc_id,
-            "product_id": product_id,
-            "chunk_index": c["chunk_index"],
-            "content": c["content"],
-            "page_number": c["page_number"],
-            "section_tag": c["section_tag"],
-            "char_count": c["char_count"],
-        }
-        for c in chunks
-    ]
-
-    for i in range(0, len(chunk_rows), 100):
-        supabase.table("document_chunks").insert(chunk_rows[i : i + 100]).execute()
-
-    # Trigger background MOSS indexing
-    background_tasks.add_task(_index_product, product_id)
+    # Move all heavy work (PDF parsing, chunking, indexing) to background
+    background_tasks.add_task(
+        _process_pdf_background, file_bytes, doc_id, product_id, title, file_url
+    )
 
     return {
         "document_id": doc_id,
         "title": title,
-        "page_count": page_count,
-        "chunk_count": len(chunks),
-        "message": "Document uploaded and indexing started",
+        "message": "Document uploaded. Parsing and indexing in background.",
     }
 
 
@@ -120,7 +137,7 @@ async def add_link(product_id: str, body: DocumentLinkCreate):
         "title": body.title,
         "type": body.type,
         "external_url": body.external_url,
-        "indexed": False,
+        "indexed": True,
     }).execute()
     return result.data[0]
 
@@ -140,3 +157,4 @@ async def delete_document(document_id: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(_index_product, product_id)
 
     return {"message": "Document deleted and index rebuilding"}
+
