@@ -1,0 +1,8 @@
+# Global gitignore
+.DS_Store
+.vscode/
+.idea/
+
+# Ignore old root artifacts
+*.pdf
+start.bat
