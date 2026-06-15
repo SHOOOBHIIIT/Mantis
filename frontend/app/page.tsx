@@ -62,15 +62,16 @@ export default function LandingPage() {
             </motion.div>
 
             {/* Stats */}
-            <motion.div variants={item} className="mt-20 grid grid-cols-3 gap-8 max-w-md mx-auto p-6 rounded-3xl bg-black/20 backdrop-blur-md border border-white/5">
+            <motion.div variants={item} className="mt-20 flex items-center justify-center gap-12 max-w-lg mx-auto">
               {[
-                { value: '<10ms', label: 'MOSS retrieval' },
-                { value: 'GPT-4o', label: 'AI model' },
-                { value: '6-step', label: 'diagnosis' },
-              ].map((stat) => (
-                <div key={stat.label} className="text-center">
-                  <div className="text-3xl font-black text-brand-400 drop-shadow-md">{stat.value}</div>
-                  <div className="text-xs text-text-muted mt-2 font-medium tracking-wide uppercase">{stat.label}</div>
+                { value: '<10ms', label: 'Retrieval Speed' },
+                { value: 'Gemini', label: 'AI Engine' },
+                { value: '6-Step', label: 'Diagnostic Flow' },
+              ].map((stat, i) => (
+                <div key={stat.label} className="flex flex-col items-center gap-1">
+                  <div className="text-2xl sm:text-3xl font-black text-brand-400">{stat.value}</div>
+                  <div className="text-[11px] text-text-muted font-medium tracking-wider uppercase">{stat.label}</div>
+                  {i < 2 && <span className="hidden" />}
                 </div>
               ))}
             </motion.div>
@@ -179,18 +180,18 @@ export default function LandingPage() {
               </div>
               <div className="space-y-4">
                 {[
-                  { name: 'Ola S1 Pro', docs: 3, category: '🛵', indexed: true },
-                  { name: 'Dyson V15', docs: 5, category: '⚡', indexed: true },
-                  { name: 'Daikin 1.5T AC', docs: 2, category: '❄️', indexed: false },
+                  { name: 'Industrial Motor X200', docs: 4, category: '⚙️', indexed: true },
+                  { name: 'Smart Thermostat Pro', docs: 3, category: '🌡️', indexed: true },
+                  { name: 'EV Charger Station', docs: 2, category: '🔋', indexed: true },
                 ].map((p) => (
                   <div key={p.name} className="flex items-center gap-4 px-4 py-4 bg-white/5 rounded-2xl border border-white/5 transition-colors hover:bg-white/10">
                     <span className="text-3xl">{p.category}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-base font-bold text-text-primary">{p.name}</p>
-                      <p className="text-xs text-text-muted mt-0.5">{p.docs} documents</p>
+                      <p className="text-xs text-text-muted mt-0.5">{p.docs} manuals uploaded</p>
                     </div>
-                    <span className={`text-xs px-3 py-1 font-bold rounded-full border ${p.indexed ? 'text-green-400 bg-green-500/10 border-green-500/20' : 'text-orange-400 bg-orange-500/10 border-orange-500/20'}`}>
-                      {p.indexed ? 'Indexed' : 'Indexing…'}
+                    <span className="text-xs px-3 py-1 font-bold rounded-full border text-green-400 bg-green-500/10 border-green-500/20">
+                      Ready
                     </span>
                   </div>
                 ))}

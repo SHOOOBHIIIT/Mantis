@@ -22,7 +22,7 @@ export function Footer() {
               Products
             </Link>
             <span>·</span>
-            <span>Built with ❤️ at hackathon</span>
+            <span>Built with ❤️ by vortex</span>
           </div>
         </div>
       </div>
